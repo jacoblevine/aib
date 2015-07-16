@@ -167,9 +167,7 @@ class Partition:
         # Eliminate duplicates using set comprehension
         # Eliminate "self pairs" which will show up in new_pairs list as None
         new_pairs = {pair for pair in new_pairs if pair}
-        new_costs = dict()
-        for pair in new_pairs:
-            new_costs[pair] = self.clusters.calc_merge_cost(*pair)
+        new_costs = {pair: self.clusters.calc_merge_cost(*pair) for pair in new_pairs}
         self.merge_costs.update(new_costs)
 
 
