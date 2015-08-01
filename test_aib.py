@@ -3,7 +3,7 @@ from sklearn.datasets import load_iris
 import unittest
 
 
-class MyTestCase(unittest.TestCase):
+class IrisTestCase(unittest.TestCase):
 
     def setUp(self):
         self.data = load_iris().data[:, 2]  # this variable looks reasonably discrete, relative to target
