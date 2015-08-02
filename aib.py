@@ -69,8 +69,6 @@ class Partition:
 
     Partition implements selecting the pair of clusters to merge and sends the merge call to ClusterDict
     """
-    clusters = ClusterDict()
-    merge_costs = dict()
 
     def __init__(self, data, relevance_variable):
         """Initialize Partition, placing each unique value in data into its own cluster"""
@@ -78,19 +76,24 @@ class Partition:
         if len(data.shape) == 1:
             data = data[:, np.newaxis]
         self.Y = len(set(relevance_variable))
+        self.clusters = ClusterDict()
+        self.merge_costs = dict()
         """Construct dataset as a numpy array of DataPoint objects
         By processing data in order, each DataPoint carries with it its index in the data set
         A numpy array is used to support boolean indexing in the for loop below
         """
+        DataPoint.index = 0  # Every time a new partition is initialized, reset the DataPoint index tracker
         dataset = np.array([DataPoint(x, y) for x, y in zip(data, relevance_variable)])
+        assert len(dataset) == DataPoint.index == np.prod(data.shape)
         """
         If data are multidimensional, we need each entry as a tuple in order to hash
         """
         data_set = {tuple(row) for row in data}  # nb: data_set is an actual Set
-        for i, x in enumerate(set(data_set)):
+        for i, x in enumerate(data_set):
             index = np.array([tuple(row) == x for row in data], dtype=bool)
             self.clusters[i] = tuple(dataset[index])
         self.calc_all_merge_costs()
+        assert max([max(k) for k in self.merge_costs.keys()]) + 1 == self.m
 
     @property
     def m(self):
@@ -128,6 +131,7 @@ class Partition:
         """
         min_pair = min(self.merge_costs, key=lambda x: self.merge_costs[x])
         min_val = self.merge_costs[min_pair]
+        assert min_val == self.clusters.calc_merge_cost(*min_pair)
         ties = [k for k, v in self.merge_costs.items() if v == min_val]
         if len(ties) > 1:
             d = {pair: self.cluster_distance(*pair) for pair in ties}
@@ -171,7 +175,14 @@ class Partition:
         self.merge_costs.update(new_costs)
 
 
-def aib(data, relevance_variable):
+def preprocess(data, n_states):
+    """If the data are approximately continuous, start by approximating the data by
+    a fine-grained quantization into M (or fewer, depending on distribution!) distinct values"""
+    index = np.digitize(data, np.linspace(data.min()-1, data.max()+1, n_states+1))
+    return np.fromiter((val for val in map(lambda i: data[index == i].mean(), index)), dtype=float)
+
+
+def aib(data, relevance_variable, n_init_states=None):
     """
     Run the Agglomerative Information Bottleneck algorithm (Slonim & Tishby, NIPS, 1999)
 
@@ -187,13 +198,20 @@ def aib(data, relevance_variable):
     :return score: dict storing the mutual information between the m-discretization and the relevance variable
         Can be used to select the appropriate value for m = |Z|
     """
+    if len(data.shape) > 1 and np.prod(data.shape) > max(data.shape):
+        raise NotImplementedError("Currently, aib is implemented only for 1-dimensional data")
+
+    # Pre-process data with fine grid, M_init << N
+    if n_init_states:
+        data = preprocess(data, n_init_states)
+
     z = Partition(data, relevance_variable)
     result = {z.m: z.assignments}
     score = {z.m: mutual_information(z.assignments, relevance_variable)}
     while z.m > 1:
         z.merge_next()
         m = z.m
-        d = z.assignments
+        d = np.array(z.assignments)
         result[m] = d
         score[m] = mutual_information(d, relevance_variable)
         print("Partition computed for |Z| = {}".format(m), flush=True)
