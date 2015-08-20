@@ -40,6 +40,11 @@ class ClusterDict(dict):
         (needed for calc_merge_cost)"""
         return set(c.y for t in self.values() for c in t)
 
+    @property
+    def means(self):
+        """Return a dictionary of hash keys with their cluster means"""
+        return {key: np.mean([datapoint.x for datapoint in cluster]) for key, cluster in self.items()}
+
     def calc_merge_cost(self, i, j):
         zi = self[i]
         zj = self[j]
@@ -104,7 +109,10 @@ class Partition:
     def assignments(self):
         """Iterate through ClusterDict and return cluster assignments, sorted by data index"""
         i, z = zip(*sorted([(point.index, key) for key, datapoints in self.clusters.items() for point in datapoints]))
-        return z
+        # Rename cluster labels (z values) so they are sorted by increasing cluster mean
+        cluster_means = self.clusters.means
+        rename = {j: i for i, j in enumerate(sorted(cluster_means.keys(), key=lambda x: cluster_means[x]))}
+        return np.array([rename[i] for i in z])
 
     def calc_all_merge_costs(self):
         """
@@ -192,6 +200,10 @@ def aib(data, relevance_variable, n_init_states=None):
     :param relevance_variable: the relevance variable (Y)
     :type relevance_variable: numpy.ndarray
 
+    :param n_init_states: If not none, start the algorithm from a crude discretization
+        into this many linearly-spaced bins. Strongly recommended for large real-valued data.
+    :type n_init_states: int (or float representation of integer)
+
     :return result: dict storing the discretization at each iteration
         e.g., result[3] will return a tuple specifying one of three values for each row in data
 
@@ -199,7 +211,9 @@ def aib(data, relevance_variable, n_init_states=None):
         Can be used to select the appropriate value for m = |Z|
     """
     if len(data.shape) > 1 and np.prod(data.shape) > max(data.shape):
-        raise NotImplementedError("Currently, aib is implemented only for 1-dimensional data")
+        raise NotImplementedError("Currently, aib is implemented only for 1-dimensional data. "
+                                  "Multi-dimensional data can be discretized one variable at a time "
+                                  "with respect to the relevance variable.")
 
     # Pre-process data with fine grid, M_init << N
     if n_init_states:
