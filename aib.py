@@ -28,6 +28,11 @@ class ClusterDict(dict):
     Each item in ClusterDict is a cluster, and the hash key is the cluster ID
     """
 
+    def __init__(self):
+        super().__init__()
+        self._cached_Y = None
+
+
     @property
     def n(self):
         """Total number of DataPoints (not clusters!) in the ClusterDict"""
@@ -38,7 +43,10 @@ class ClusterDict(dict):
         """Special feature for the AIB implementation:
         Return the set of all relevance_variable values
         (needed for calc_merge_cost)"""
-        return set(c.y for t in self.values() for c in t)
+        if self._cached_Y is None:
+            return set(c.y for t in self.values() for c in t)
+        else:
+            return self._cached_Y
 
     @property
     def means(self):
@@ -186,8 +194,12 @@ class Partition:
 def preprocess(data, n_states):
     """If the data are approximately continuous, start by approximating the data by
     a fine-grained quantization into M (or fewer, depending on distribution!) distinct values"""
-    index = np.digitize(data, np.linspace(data.min()-1, data.max()+1, n_states+1))
-    return np.fromiter((val for val in map(lambda i: data[index == i].mean(), index)), dtype=float)
+    _, bins = np.histogram(data, bins=n_states)
+    index = np.digitize(data, np.concatenate((bins[:-1], [np.inf]))) - 1
+    # ^ digitize handles rightmost bin differently than histogram
+    centers = .5 * (bins[1:] + bins[:-1])  # bin centers are the quantized values for each state
+    valmap = {i: val for i, val in enumerate(centers)}
+    return np.fromiter((valmap[i] for i in index), dtype=float)
 
 
 def aib(data, relevance_variable, n_init_states=None):
