@@ -44,9 +44,11 @@ class ClusterDict(dict):
         Return the set of all relevance_variable values
         (needed for calc_merge_cost)"""
         if self._cached_Y is None:
-            return set(c.y for t in self.values() for c in t)
-        else:
-            return self._cached_Y
+            self._cached_Y = set(c.y for t in self.values() for c in t)
+        return self._cached_Y
+        #      return set(c.y for t in self.values() for c in t)
+        # else:
+        #     return self._cached_Y
 
     @property
     def means(self):
@@ -169,18 +171,22 @@ class Partition:
             else:
                 return pair
 
+        # Decide which pair of clusters to merge next
         min_pair = self.find_merge_pair()
+        # Execute merge
         self.clusters.merge(*min_pair)
         """After merge, recompute costs related to the merged clusters
         Two steps:
             1) Update pointers to point to the merged pair (the min of min_pair)
             2) Process this list with clusters.calc_merge_cost
         """
+
         # First remove entries in merge_costs that are obsolete after merger
         remove = [key for key in self.merge_costs.keys()
                   if any([k in min_pair for k in key])]
-        self.merge_costs = {key: value for key, value in self.merge_costs.items()
-                            if key not in remove}
+        for key in remove:
+            del self.merge_costs[key]
+
         # Now compute costs for updated pairs and add to merge_costs
         new, old = sorted(min_pair)
         new_pairs = [_update(pair, new, old) for pair in remove]
