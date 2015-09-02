@@ -97,7 +97,7 @@ class Partition:
         """
         DataPoint.index = 0  # Every time a new partition is initialized, reset the DataPoint index tracker
         dataset = np.array([DataPoint(x, y) for x, y in zip(data, relevance_variable)])
-        assert len(dataset) == DataPoint.index == np.prod(data.shape)
+        assert len(dataset) == DataPoint.index
         """
         If data are multidimensional, we need each entry as a tuple in order to hash
         """
