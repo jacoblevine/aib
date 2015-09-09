@@ -30,22 +30,26 @@ class ClusterDict(dict):
 
     def __init__(self):
         super().__init__()
-        self._cached_Y = None
-
+        self._cache = dict()
 
     @property
     def n(self):
         """Total number of DataPoints (not clusters!) in the ClusterDict"""
-        return sum(len(t) for t in self.values())
+        if 'n' not in self._cache.keys():
+            self._cache['n'] = sum(len(t) for t in self.values())
+        return self._cache['n']
 
     @property
     def Y(self):
         """Special feature for the AIB implementation:
         Return the set of all relevance_variable values
         (needed for calc_merge_cost)"""
-        if self._cached_Y is None:
-            self._cached_Y = set(c.y for t in self.values() for c in t)
-        return self._cached_Y
+        if 'Y' not in self._cache.keys():
+            self._cache['Y'] = set(c.y for t in self.values() for c in t)
+        return self._cache['Y']
+        # if self._cached_Y is None:
+        #     self._cached_Y = set(c.y for t in self.values() for c in t)
+        # return self._cached_Y
         #      return set(c.y for t in self.values() for c in t)
         # else:
         #     return self._cached_Y
@@ -240,11 +244,13 @@ def aib(data, relevance_variable, n_init_states=None):
     z = Partition(data, relevance_variable)
     result = {z.m: z.assignments}
     score = {z.m: mutual_information(z.assignments, relevance_variable)}
+    print_points = np.linspace(0, z.m, 100).round()
     while z.m > 1:
         z.merge_next()
         m = z.m
         d = np.array(z.assignments)
         result[m] = d
         score[m] = mutual_information(d, relevance_variable)
-        print("Partition computed for |Z| = {}".format(m), flush=True)
+        if m in print_points:
+            print("Partition computed for |Z| = {}".format(m), flush=True)
     return result, score
