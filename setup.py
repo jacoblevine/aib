@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='AIB',
+    name='aib',
     version='0.1',
     packages=find_packages(),
     url='https://www.github.com/jacoblevine/aib',
